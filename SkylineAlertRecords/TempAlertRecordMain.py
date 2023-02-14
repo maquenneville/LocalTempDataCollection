@@ -158,24 +158,31 @@ def main():
     image_path = download_image()
     m_text, temp, wind, hum = extract_text(image_path)
 
-    # start multiple threads to send the text
-    threads = []
-    for name, number in recipients.items():
-        me_text = f"Hi {name}!\n{m_text}"
-        t = threading.Thread(
-            target=send_text,
-            args=(
-                number,
-                name,
-                me_text,
-            ),
-        )
-        threads.append(t)
-        t.start()
-
-    # wait for all threads to finish
-    for thread in threads:
-        thread.join()
+    if temp < 32.0:
+        #start multiple threads to send the text
+        threads = []
+        for name, number in recipients.items():
+            me_text = f"Freezing Temp Alert!\n{m_text}"
+            t = threading.Thread(target=send_text, args=(number, name, me_text,))
+            threads.append(t)
+            t.start()
+        
+        #wait for all threads to finish
+        for thread in threads:
+            thread.join()
+            
+    if temp > 90.0:
+        #start multiple threads to send the text
+        threads = []
+        for name, number in recipients.items():
+            me_text = f"Extreme Heat Alert!\n{m_text}"
+            t = threading.Thread(target=send_text, args=(number, name, me_text,))
+            threads.append(t)
+            t.start()
+        
+        #wait for all threads to finish
+        for thread in threads:
+            thread.join()
 
     insert_weather_data(
         temp, wind, hum, db_name, db_user, db_password, db_host, db_port
