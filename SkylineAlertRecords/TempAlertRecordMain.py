@@ -78,7 +78,7 @@ def extract_text(image_file_path):
     print("Extracting text...")
 
     ite = 30
-    t_text, w_text, h_text = None, None, None
+    t_text, w_text, h_text, hi_text, lo_text = None, None, None, None, None
 
     while ite > 0:
         try:
@@ -99,6 +99,10 @@ def extract_text(image_file_path):
 
         hum_regex = r"(\d{1,2})\s?\%"
         temp_regex = r"(\d{1,3}\.\d{1,2})"
+        hi_regex = r"Hi\s*\d{3}"
+        lo_regex = r"Lo\s*\d{3}"
+
+        print(text_list)
 
         for i in text_list:
             if "Temperature" in i:
@@ -122,7 +126,7 @@ def extract_text(image_file_path):
 
                 else:
                     w_text = None
-               
+                # w_text = i.split(' ')[-1][:-2].strip()
             if "Humidity" in i:
                 match = re.search(hum_regex, i)
                 if match:
@@ -134,7 +138,37 @@ def extract_text(image_file_path):
                 else:
                     h_text = None
 
-        if t_text and w_text and h_text:
+            if "Hi" in i:
+                match = re.search(hi_regex, i)
+                if match:
+                    number_string = match.group(1)
+                    first_two_numbers = number_string[:2]
+                    last_number = number_string[2:]
+                    hi_text = float(first_two_numbers + "." + last_number)
+
+                elif hi_text:
+                    pass
+
+                else:
+                    hi_text = None
+
+            if "Lo" in i:
+                match = re.search(lo_regex, i)
+                if match:
+                    number_string = match.group(1)
+                    first_two_numbers = number_string[:2]
+                    last_number = number_string[2:]
+                    lo_text = float(first_two_numbers + "." + last_number)
+
+                elif lo_text:
+                    pass
+
+                else:
+                    lo_text = None
+
+        print(t_text, w_text, h_text, hi_text, lo_text)
+
+        if t_text and w_text and h_text and hi_text and lo_text:
 
             ite = 0
             break
@@ -150,6 +184,8 @@ def extract_text(image_file_path):
         float(t_text),
         float(w_text),
         float(h_text),
+        float(hi_text),
+        float(lo_text),
     )
 
 
@@ -159,28 +195,42 @@ def main():
     m_text, temp, wind, hum = extract_text(image_path)
 
     if temp < 32.0:
-        #start multiple threads to send the text
+        # start multiple threads to send the text
         threads = []
         for name, number in recipients.items():
             me_text = f"Freezing Temp Alert!\n{m_text}"
-            t = threading.Thread(target=send_text, args=(number, name, me_text,))
+            t = threading.Thread(
+                target=send_text,
+                args=(
+                    number,
+                    name,
+                    me_text,
+                ),
+            )
             threads.append(t)
             t.start()
-        
-        #wait for all threads to finish
+
+        # wait for all threads to finish
         for thread in threads:
             thread.join()
-            
+
     if temp > 90.0:
-        #start multiple threads to send the text
+        # start multiple threads to send the text
         threads = []
         for name, number in recipients.items():
             me_text = f"Extreme Heat Alert!\n{m_text}"
-            t = threading.Thread(target=send_text, args=(number, name, me_text,))
+            t = threading.Thread(
+                target=send_text,
+                args=(
+                    number,
+                    name,
+                    me_text,
+                ),
+            )
             threads.append(t)
             t.start()
-        
-        #wait for all threads to finish
+
+        # wait for all threads to finish
         for thread in threads:
             thread.join()
 

@@ -65,7 +65,7 @@ def rename_tables(db_name, db_user, db_password, db_host, db_port, year):
 
 
 def insert_weather_data(
-    temp, wind, hum, db_name, db_user, db_password, db_host, db_port
+    temp, wind, hum, hi, lo, db_name, db_user, db_password, db_host, db_port
 ):
 
     print("Loading temperature into Skyline temp database...")
@@ -85,10 +85,10 @@ def insert_weather_data(
 
     # Insert data into table
     cur.execute(
-        "INSERT INTO {} (date, temperature, windchill, humidity) VALUES (%s, %s, %s, %s)".format(
+        "INSERT INTO {} (date, temperature, windchill, humidity, high, low) VALUES (%s, %s, %s, %s, %s, %s)".format(
             table_name
         ),
-        (today, temp, wind, hum),
+        (today, temp, wind, hum, hi, lo),
     )
 
     # Commit the changes to the database
