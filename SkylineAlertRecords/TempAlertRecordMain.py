@@ -61,7 +61,11 @@ def download_image():
     for chunk in response.iter_content(100000):
         imageFile.write(chunk)
     imageFile.close()
-    return source_url
+    weather_image = Image.open(source_image_path)
+    width, height = weather_image.size
+    triple_size = weather_image.resize((int(width*3), int(height*3)), Image.ANTIALIAS)
+    triple_size.save(source_image_path)
+    return source_image_path
 
 
 def send_text(number, name, text):
@@ -99,8 +103,8 @@ def extract_text(image_file_path):
 
         hum_regex = r"(\d{1,2})\s?\%"
         temp_regex = r"(\d{1,3}\.\d{1,2})"
-        hi_regex = r"Hi\s*\d{3}"
-        lo_regex = r"Lo\s*\d{3}"
+        hi_regex = r"Hi\s*\d{1,3}\.\d{1,2}"
+        lo_regex = r"Lo\s*\d{1,3}\.\d{1,2}"
 
         print(text_list)
 
@@ -141,10 +145,7 @@ def extract_text(image_file_path):
             if "Hi" in i:
                 match = re.search(hi_regex, i)
                 if match:
-                    number_string = match.group(1)
-                    first_two_numbers = number_string[:2]
-                    last_number = number_string[2:]
-                    hi_text = float(first_two_numbers + "." + last_number)
+                    hi_text = float(match.group(1))
 
                 elif hi_text:
                     pass
@@ -155,10 +156,7 @@ def extract_text(image_file_path):
             if "Lo" in i:
                 match = re.search(lo_regex, i)
                 if match:
-                    number_string = match.group(1)
-                    first_two_numbers = number_string[:2]
-                    last_number = number_string[2:]
-                    lo_text = float(first_two_numbers + "." + last_number)
+                    lo_text = float(match.group(1))
 
                 elif lo_text:
                     pass
