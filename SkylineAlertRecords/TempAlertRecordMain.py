@@ -11,7 +11,7 @@ from io import BytesIO
 import requests
 from bs4 import BeautifulSoup
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageOps
 import smtplib
 import threading
 import psycopg2
@@ -27,6 +27,7 @@ pytesseract.tesseract_cmd = tesseract_path
 
 source_url = ""
 source_image_path = ""
+source_image_pathHiLo = ""
 
 
 # Set text messaging variables
@@ -63,9 +64,18 @@ def download_image():
     imageFile.close()
     weather_image = Image.open(source_image_path)
     width, height = weather_image.size
-    triple_size = weather_image.resize((int(width*3), int(height*3)), Image.ANTIALIAS)
+    triple_size = weather_image.resize(
+        (int(width * 3), int(height * 3)), Image.ANTIALIAS
+    )
+    triple_size = ImageOps.grayscale(triple_size)
+    triple_size = ImageOps.autocontrast(triple_size)
+    hi_lo_image = triple_size.crop((452, 0, 678, 360))
+    hi_lo_image = ImageOps.grayscale(hi_lo_image)
+    hi_lo_image = ImageOps.autocontrast(hi_lo_image)
     triple_size.save(source_image_path)
-    return source_image_path
+    hi_lo_image.save(source_image_pathHiLo)
+
+    return source_image_path, source_image_pathHiLo
 
 
 def send_text(number, name, text):
@@ -78,7 +88,7 @@ def send_text(number, name, text):
     print(f"Text sent to {name}")
 
 
-def extract_text(image_file_path):
+def extract_text(image_file_path, hi_lo_file_path):
     print("Extracting text...")
 
     ite = 30
@@ -87,19 +97,23 @@ def extract_text(image_file_path):
     while ite > 0:
         try:
             text_raw = pytesseract.image_to_string(Image.open(image_file_path))
+            text_hi_lo = pytesseract.image_to_string(Image.open(hi_lo_file_path))
         except:
             print("Could not read file, trying again...")
             try:
                 time.sleep(600)
-                image_file_path = download_image()
+                image_file_path, hi_lo_file_path = download_image()
                 text_raw = pytesseract.image_to_string(Image.open(image_file_path))
+                text_hi_lo = pytesseract.image_to_string(Image.open(hi_lo_file_path))
             except:
                 print("Could not read file, trying once more...")
                 time.sleep(600)
-                image_file_path = download_image()
+                image_file_path, hi_lo_file_path = download_image()
                 text_raw = pytesseract.image_to_string(Image.open(image_file_path))
+                text_hi_lo = pytesseract.image_to_string(Image.open(hi_lo_file_path))
 
         text_list = text_raw.split("\n")
+        hi_lo_list = text_hi_lo.split("\n")
 
         hum_regex = r"(\d{1,2})\s?\%"
         temp_regex = r"(\d{1,3}\.\d{1,2})"
@@ -107,6 +121,7 @@ def extract_text(image_file_path):
         lo_regex = r"Lo\s*\d{1,3}\.\d{1,2}"
 
         print(text_list)
+        print(hi_lo_list)
 
         for i in text_list:
             if "Temperature" in i:
@@ -120,7 +135,7 @@ def extract_text(image_file_path):
                 else:
                     t_text = None
 
-            if "Wind chill" in i:
+            if "Wind chill" in i or "wind chill" in i:
                 match = re.search(temp_regex, i)
                 if match:
                     w_text = float(match.group(1))
@@ -130,8 +145,8 @@ def extract_text(image_file_path):
 
                 else:
                     w_text = None
-                # w_text = i.split(' ')[-1][:-2].strip()
-            if "Humidity" in i:
+
+            if "Humidity" in i or "humidity" in i:
                 match = re.search(hum_regex, i)
                 if match:
                     h_text = float(match.group(1))
@@ -142,10 +157,12 @@ def extract_text(image_file_path):
                 else:
                     h_text = None
 
+        for i in hi_lo_list:
+
             if "Hi" in i:
                 match = re.search(hi_regex, i)
                 if match:
-                    hi_text = float(match.group(1))
+                    hi_text = float(match.group(0)[2:])
 
                 elif hi_text:
                     pass
@@ -156,7 +173,7 @@ def extract_text(image_file_path):
             if "Lo" in i:
                 match = re.search(lo_regex, i)
                 if match:
-                    lo_text = float(match.group(1))
+                    lo_text = float(match.group(0)[2:])
 
                 elif lo_text:
                     pass
@@ -175,7 +192,7 @@ def extract_text(image_file_path):
 
             ite -= 1
             time.sleep(600)
-            image_file_path = download_image()
+            image_file_path, hi_lo_file_path = download_image()
 
     return (
         f"Skyview Weather Today: {t_text} deg, Wind Chill {w_text} deg, Humidity {h_text} perc",
@@ -189,8 +206,8 @@ def extract_text(image_file_path):
 
 def main():
 
-    image_path = download_image()
-    m_text, temp, wind, hum = extract_text(image_path)
+    image_path, hi_lo = download_image()
+    m_text, temp, wind, hum, hi, lo = extract_text(image_path, hi_lo)
 
     if temp < 32.0:
         # start multiple threads to send the text
