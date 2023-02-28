@@ -76,23 +76,32 @@ def insert_weather_data(
     cur = conn.cursor()
 
     # Get current month and year
-    today = datetime.today()
-    current_month = str(today.month).zfill(2)
-    current_year = today.year
+    today = datetime.now()
+    today_date = today.strftime("%Y-%m-%d")
+    current_month = today.strftime("%m")
+    current_day = today.strftime("%d")
+    current_year = today.strftime("%Y")
 
     # Determine table name based on current month and year
     table_name = "temperature_" + str(current_month) + "_" + str(current_year)
 
-    # Insert data into table
-    cur.execute(
-        "INSERT INTO {} (date, temperature, windchill, humidity, high, low) VALUES (%s, %s, %s, %s, %s, %s)".format(
-            table_name
-        ),
-        (today, temp, wind, hum, hi, lo),
-    )
+    # Check if a row already exists for today
+    cur.execute("SELECT date FROM {} WHERE date = %s".format(table_name), (today_date,))
+    row = cur.fetchone()
+    if row is not None:
+        print("Today's weather already recorded")
+    else:
+        # Insert data into table
+        cur.execute(
+            "INSERT INTO {} (date, temperature, windchill, humidity, high, low) VALUES (%s, %s, %s, %s, %s, %s)".format(
+                table_name
+            ),
+            (today_date, temp, wind, hum, hi, lo),
+        )
 
-    # Commit the changes to the database
-    conn.commit()
+        # Commit the changes to the database
+        conn.commit()
+        print("Temperature added to database")
 
     # Close the cursor and connection
     cur.close()
@@ -216,56 +225,6 @@ def drop_date_primary_key(database_name, username, password, host, port):
         conn.close()
 
 
-def create_daily_table(db_name, db_user, db_password, db_host, db_port, year):
-
-    conn = psycopg2.connect(
-        dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port
-    )
-    cur = conn.cursor()
-
-    # Get current date and month
-    today = datetime.now().date()
-    month = today.strftime("%m")
-
-    # Create daily table name
-    daily_table = "daily_" + str(today)
-
-    # Check if the current monthly table exists
-    monthly_table = f"temperature_{month}_{year}"
-    print(monthly_table)
-    try:
-        cur.execute(f"SELECT * FROM {monthly_table} LIMIT 1")
-    except Exception:
-        print("The current monthly table does not exist.")
-        return
-
-    # Create daily table with a foreign key column
-    create_table = f"""
-        CREATE TABLE {daily_table} (
-            id SERIAL PRIMARY KEY,
-            date_id DATE NOT NULL,
-            hour INT NOT NULL,
-            temperature FLOAT NOT NULL,
-            windchill FLOAT NOT NULL,
-            humidity FLOAT NOT NULL,
-            FOREIGN KEY (date_id) REFERENCES {monthly_table}(date)
-        );
-    """
-    try:
-        cur.execute(create_table)
-        conn.commit()
-        print(
-            f"Table {daily_table} created successfully with a foreign key to {monthly_table}(date)."
-        )
-
-    except:
-        print("Could not create table.")
-
-    finally:
-        cur.close()
-        conn.close()
-
-
 def generate_monthly_report(db_name, db_user, db_password, db_host, db_port):
     # Connect to the PostgreSQL database
     conn = psycopg2.connect(
@@ -339,3 +298,92 @@ def plot_monthly_temperature(db_name, db_user, db_password, db_host, db_port):
     plt.show()
     cur.close()
     conn.close()
+
+
+def create_daily_table(db_name, db_user, db_password, db_host, db_port):
+    # Connect to the PostgreSQL database
+    conn = psycopg2.connect(
+        dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port
+    )
+    cur = conn.cursor()
+
+    today = datetime.now()
+    current_month = today.strftime("%m")
+    current_day = today.strftime("%d")
+    current_year = today.strftime("%Y")
+    table_name = f"daily_{current_month}_{current_day}"
+    # Determine table name based on current month and year
+    monthly_table_name = f"temperature_{current_month}_{current_year}"
+
+    try:
+        cur.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                id SERIAL PRIMARY KEY,
+                day INT,
+                date_id DATE REFERENCES {monthly_table_name}(date),
+                time INT,
+                temperature FLOAT,
+                windchill FLOAT,
+                humidity FLOAT
+            )"""
+        )
+        conn.commit()
+        print("Table created successfully")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error while creating table", error)
+        conn.rollback()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def insert_daily_data(temp, wind, hum, db_name, db_user, db_password, db_host, db_port):
+    try:
+        conn = psycopg2.connect(
+            dbname=db_name,
+            user=db_user,
+            password=db_password,
+            host=db_host,
+            port=db_port,
+        )
+        cur = conn.cursor()
+
+        current_time = datetime.now()
+        year = current_time.strftime("%Y")
+        month = current_time.strftime("%m")
+        day = current_time.strftime("%d")
+        hour = current_time.strftime("%H")
+        time = current_time.strftime("%H") + current_time.strftime("%m")
+
+        # Get date_id from monthly table for the given year and month
+        cur.execute(
+            f"SELECT date FROM temperature_{month}_{year} WHERE EXTRACT(DAY FROM date) = {day};"
+        )
+        result = cur.fetchone()
+        if result is None:
+            print(f"No data found for year={year}, month={month}, day={day}")
+            return
+
+        # Insert new row into the appropriate daily table
+        date_id = result[0]
+        cur.execute(f"SELECT id FROM daily_{month}_{day} ORDER BY id DESC LIMIT 1")
+        result = cur.fetchone()
+        new_id = 1 if result is None else result[0] + 1
+
+        SQL = (
+            f"INSERT INTO daily_{month}_{day} (id, day, date_id, time, temperature, windchill, humidity) "
+            f"VALUES ({new_id}, {int(day)}, '{date_id}', {time}, {temp}, {wind}, {hum})"
+        )
+        cur.execute(SQL)
+        conn.commit()
+        print(f"Data inserted into daily_{month}_{day} table")
+
+    except (Exception, psycopg2.Error) as error:
+        print("Error while connecting to PostgreSQL", error)
+
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+            print("PostgreSQL connection is closed")
