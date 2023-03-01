@@ -17,7 +17,7 @@ import psycopg2
 import datetime
 import time
 import re
-from TempDatabaseHelpers import create_daily_table, insert_daily_data, insert_weather_data
+from TempDatabaseHelpers import create_daily_table, insert_daily_data, insert_weather_data, backup_database
 
 # Declare tesseract.exe
 tesseract_path = "C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -39,6 +39,9 @@ recipients = {
     "Person3": "number@vtext.com",
     "Person4": "number@vtext.com",
 }
+
+
+backup_directory = ""
 
 # Declare database credentials
 db_host = "host"
@@ -268,10 +271,11 @@ def main():
                         
             if hour == 9:
                 sent = False
-
+    
             insert_weather_data(temp, wind, hum, hi, lo, db_name, db_user, db_password, db_host, db_port)
             create_daily_table(db_name, db_user, db_password, db_host, db_port) 
             insert_daily_data(temp, wind, hum, db_name, db_user, db_password, db_host, db_port)
+            backup_database(db_name, db_user, db_password, db_host, db_port, backup_directory)
             
             # Get the current time
             now = datetime.datetime.now()

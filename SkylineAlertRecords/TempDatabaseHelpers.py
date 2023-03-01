@@ -12,6 +12,8 @@ import numpy as np
 from psycopg2 import sql
 from datetime import datetime, timedelta
 import re
+import os
+import subprocess
 
 
 def create_monthly_tables(db_name, db_user, db_password, db_host, db_port, year):
@@ -387,3 +389,33 @@ def insert_daily_data(temp, wind, hum, db_name, db_user, db_password, db_host, d
             cur.close()
             conn.close()
             print("PostgreSQL connection is closed")
+            
+            
+            
+def backup_database(db_name, db_user, db_password, db_host, db_port, backup_directory):
+    """
+    Backs up a PostgreSQL database to a specified directory.
+
+    :param db_name: The name of the database to back up
+    :param db_user: The username to use for the database connection
+    :param db_password: The password to use for the database connection
+    :param db_host: The hostname of the database server
+    :param db_port: The port number of the database server
+    :param backup_directory: The directory to save the backup file to
+    """
+    # Create a filename for the backup file based on the current date and time
+    now = datetime.datetime.now()
+    filename = db_name + "_" + now.strftime("%Y-%m-%d_%H-%M-%S") + ".backup"
+
+    # Build the pg_dump command
+    cmd = [
+        "pg_dump",
+        "--dbname=postgresql://" + db_user + ":" + db_password + "@" + db_host + ":" + db_port + "/" + db_name,
+        "--format=custom",
+        "--file=" + os.path.join(backup_directory, filename)
+    ]
+
+    # Call pg_dump to perform the backup
+    subprocess.call(cmd)
+
+    print("Database backup saved to " + os.path.join(backup_directory, filename))
