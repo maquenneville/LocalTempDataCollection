@@ -405,7 +405,7 @@ def backup_database(db_name, db_user, db_password, db_host, db_port, backup_dire
     """
     # Create a filename for the backup file based on the current date and time
     now = datetime.datetime.now()
-    filename = db_name + "_" + now.strftime("%Y-%m-%d_%H-%M-%S") + ".backup"
+    filename = f"{db_name}.backup"
 
     # Build the pg_dump command
     cmd = [
