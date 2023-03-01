@@ -17,7 +17,7 @@ import psycopg2
 import datetime
 import time
 import re
-from TempDatabaseHelpers import create_daily_table, insert_daily_data
+from TempDatabaseHelpers import create_daily_table, insert_daily_data, insert_weather_data
 
 # Declare tesseract.exe
 tesseract_path = "C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -205,57 +205,86 @@ def extract_text(image_file_path, hi_lo_file_path):
 def main():
 
     while True:
+        
+        cur_time = datetime.datetime.now()
+        print(cur_time)
+        today = int(cur_time.strftime('%d'))
+        hour = int(cur_time.strftime('%H'))
+        
+        sent = False
 
-        time = datetime.datetime.now()
+        try:
 
-        image_path, hi_lo = download_image()
-        m_text, temp, wind, hum, hi, lo = extract_text(image_path, hi_lo)
+            image_path, hi_lo = download_image()
+            m_text, temp, wind, hum, hi, lo = extract_text(image_path, hi_lo)
+            
+            if hour > 7 and hour < 8:
+                
+                if not sent:
+                    
+                    if temp < 32.0:
+                        # start multiple threads to send the text
+                        threads = []
+                        for name, number in recipients.items():
+                            me_text = f"Freezing Temp Alert!\n{m_text}"
+                            t = threading.Thread(
+                                target=send_text,
+                                args=(
+                                    number,
+                                    name,
+                                    me_text,
+                                ),
+                            )
+                            threads.append(t)
+                            t.start()
+            
+                        # wait for all threads to finish
+                        for thread in threads:
+                            thread.join()
+                        
+                        sent = True
+                        
+                    if temp > 90.0:
+                        # start multiple threads to send the text
+                        threads = []
+                        for name, number in recipients.items():
+                            me_text = f"Extreme Heat Alert!\n{m_text}"
+                            t = threading.Thread(
+                                target=send_text,
+                                args=(
+                                    number,
+                                    name,
+                                    me_text,
+                                ),
+                            )
+                            threads.append(t)
+                            t.start()
+            
+                        # wait for all threads to finish
+                        for thread in threads:
+                            thread.join()
+                        
+                        sent = True
+                        
+            if hour == 9:
+                sent = False
 
-        if temp < 32.0:
-            # start multiple threads to send the text
-            threads = []
-            for name, number in recipients.items():
-                me_text = f"Freezing Temp Alert!\n{m_text}"
-                t = threading.Thread(
-                    target=send_text,
-                    args=(
-                        number,
-                        name,
-                        me_text,
-                    ),
-                )
-                threads.append(t)
-                t.start()
-
-            # wait for all threads to finish
-            for thread in threads:
-                thread.join()
-
-        if temp > 90.0:
-            # start multiple threads to send the text
-            threads = []
-            for name, number in recipients.items():
-                me_text = f"Extreme Heat Alert!\n{m_text}"
-                t = threading.Thread(
-                    target=send_text,
-                    args=(
-                        number,
-                        name,
-                        me_text,
-                    ),
-                )
-                threads.append(t)
-                t.start()
-
-            # wait for all threads to finish
-            for thread in threads:
-                thread.join()
-
-        create_daily_table, insert_daily_data
-
-        insert_weather_data(
-            temp, wind, hum, db_name, db_user, db_password, db_host, db_port
-        )
+            insert_weather_data(temp, wind, hum, hi, lo, db_name, db_user, db_password, db_host, db_port)
+            create_daily_table(db_name, db_user, db_password, db_host, db_port) 
+            insert_daily_data(temp, wind, hum, db_name, db_user, db_password, db_host, db_port)
+            
+            # Get the current time
+            now = datetime.datetime.now()
+            
+            # Calculate the amount of time to wait (in seconds)
+            wait_time = (60 - now.minute)*60
+            
+            # Wait until the next full hour
+            time.sleep(wait_time)
+            
+        except requests.exceptions.ConnectionError:
+            print("Connection error after max attempts, retrying...")
+            continue
 
 
 if __name__ == "__main__":
