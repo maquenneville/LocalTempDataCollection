@@ -66,20 +66,24 @@ def rename_tables(db_name, db_user, db_password, db_host, db_port, year):
     conn.close()
 
 
-def insert_weather_data(temp, wind, hum, hi, lo, baro, db_name, db_user, db_password, db_host, db_port):
-    
+def insert_weather_data(
+    temp, wind, hum, hi, lo, baro, db_name, db_user, db_password, db_host, db_port
+):
+
     print("Loading temperature into Skyline temp database...")
     # Connect to the PostgreSQL database
-    conn = psycopg2.connect(dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port)
+    conn = psycopg2.connect(
+        dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port
+    )
     cur = conn.cursor()
 
     # Get current month and year
     today = datetime.now()
-    today_date = today.strftime('%Y-%m-%d')
+    today_date = today.strftime("%Y-%m-%d")
     current_month = today.strftime("%m")
     current_day = today.strftime("%d")
     current_year = today.strftime("%Y")
-    
+
     # Determine table name based on current month and year
     table_name = "temperature_" + str(current_month) + "_" + str(current_year)
 
@@ -90,7 +94,12 @@ def insert_weather_data(temp, wind, hum, hi, lo, baro, db_name, db_user, db_pass
         print("Today's weather already recorded")
     else:
         # Insert data into table
-        cur.execute("INSERT INTO {} (date, temperature, windchill, humidity, high, low, barometer) VALUES (%s, %s, %s, %s, %s, %s, %s)".format(table_name), (today_date, temp, wind, hum, hi, lo, baro))
+        cur.execute(
+            "INSERT INTO {} (date, temperature, windchill, humidity, high, low, barometer) VALUES (%s, %s, %s, %s, %s, %s, %s)".format(
+                table_name
+            ),
+            (today_date, temp, wind, hum, hi, lo, baro),
+        )
 
         # Commit the changes to the database
         conn.commit()
@@ -299,17 +308,18 @@ def create_daily_table(db_name, db_user, db_password, db_host, db_port):
         dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port
     )
     cur = conn.cursor()
-    
+
     today = datetime.now()
     current_month = today.strftime("%m")
     current_day = today.strftime("%d")
     current_year = today.strftime("%Y")
     table_name = f"daily_{current_month}_{current_day}"
-     # Determine table name based on current month and year
+    # Determine table name based on current month and year
     monthly_table_name = f"temperature_{current_month}_{current_year}"
-    
+
     try:
-        cur.execute(f"""
+        cur.execute(
+            f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
                 id SERIAL PRIMARY KEY,
                 day INT,
@@ -319,7 +329,8 @@ def create_daily_table(db_name, db_user, db_password, db_host, db_port):
                 windchill FLOAT,
                 humidity FLOAT,
                 barometer FLOAT
-            )""")
+            )"""
+        )
         conn.commit()
         print("Table created successfully")
     except (Exception, psycopg2.DatabaseError) as error:
@@ -330,27 +341,34 @@ def create_daily_table(db_name, db_user, db_password, db_host, db_port):
         conn.close()
 
 
-def insert_daily_data(temp, wind, hum, baro, db_name, db_user, db_password, db_host, db_port):
+def insert_daily_data(
+    temp, wind, hum, baro, db_name, db_user, db_password, db_host, db_port
+):
     try:
         conn = psycopg2.connect(
-            dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port
+            dbname=db_name,
+            user=db_user,
+            password=db_password,
+            host=db_host,
+            port=db_port,
         )
         cur = conn.cursor()
-        
+
         current_time = datetime.now()
-        year = current_time.strftime('%Y')
-        month = current_time.strftime('%m')
-        day = current_time.strftime('%d')
-        hour = current_time.strftime('%H')
-        time = current_time.strftime('%H') + current_time.strftime('%m')
+        year = current_time.strftime("%Y")
+        month = current_time.strftime("%m")
+        day = current_time.strftime("%d")
+        hour = current_time.strftime("%H")
+        time = current_time.strftime("%H") + current_time.strftime("%m")
 
         # Get date_id from monthly table for the given year and month
-        cur.execute(f"SELECT date FROM temperature_{month}_{year} WHERE EXTRACT(DAY FROM date) = {day};")
+        cur.execute(
+            f"SELECT date FROM temperature_{month}_{year} WHERE EXTRACT(DAY FROM date) = {day};"
+        )
         result = cur.fetchone()
         if result is None:
             print(f"No data found for year={year}, month={month}, day={day}")
             return
-        
 
         # Insert new row into the appropriate daily table
         date_id = result[0]
@@ -358,8 +376,10 @@ def insert_daily_data(temp, wind, hum, baro, db_name, db_user, db_password, db_h
         result = cur.fetchone()
         new_id = 1 if result is None else result[0] + 1
 
-        SQL = f"INSERT INTO daily_{month}_{day} (id, day, date_id, time, temperature, windchill, humidity, barometer) " \
-              f"VALUES ({new_id}, {int(day)}, '{date_id}', {time}, {temp}, {wind}, {hum}, {baro})"
+        SQL = (
+            f"INSERT INTO daily_{month}_{day} (id, day, date_id, time, temperature, windchill, humidity, barometer) "
+            f"VALUES ({new_id}, {int(day)}, '{date_id}', {time}, {temp}, {wind}, {hum}, {baro})"
+        )
         cur.execute(SQL)
         conn.commit()
         print(f"Data inserted into daily_{month}_{day} table")
@@ -372,9 +392,8 @@ def insert_daily_data(temp, wind, hum, baro, db_name, db_user, db_password, db_h
             cur.close()
             conn.close()
             print("PostgreSQL connection is closed")
-            
-            
-            
+
+
 def backup_database(db_name, db_user, db_password, db_host, db_port, backup_directory):
     """
     Backs up a PostgreSQL database to a specified directory.
@@ -393,9 +412,18 @@ def backup_database(db_name, db_user, db_password, db_host, db_port, backup_dire
     # Build the pg_dump command
     cmd = [
         "pg_dump",
-        "--dbname=postgresql://" + db_user + ":" + db_password + "@" + db_host + ":" + db_port + "/" + db_name,
+        "--dbname=postgresql://"
+        + db_user
+        + ":"
+        + db_password
+        + "@"
+        + db_host
+        + ":"
+        + db_port
+        + "/"
+        + db_name,
         "--format=custom",
-        "--file=" + os.path.join(backup_directory, filename)
+        "--file=" + os.path.join(backup_directory, filename),
     ]
 
     # Call pg_dump to perform the backup
