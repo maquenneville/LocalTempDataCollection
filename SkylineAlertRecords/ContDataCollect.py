@@ -10,7 +10,7 @@ from io import BytesIO
 import requests
 from bs4 import BeautifulSoup
 import pytesseract
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageFile, ImageOps, UnidentifiedImageError
 import smtplib
 import threading
 import psycopg2
@@ -23,6 +23,9 @@ from TempDatabaseHelpers import (
     insert_weather_data,
     backup_database,
 )
+
+#Set ImageFile to accept truncated images
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Declare tesseract.exe
 tesseract_path = "C:\Program Files\Tesseract-OCR\tesseract.exe"
