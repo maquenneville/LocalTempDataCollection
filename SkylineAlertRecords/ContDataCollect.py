@@ -10,7 +10,7 @@ from io import BytesIO
 import requests
 from bs4 import BeautifulSoup
 import pytesseract
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
 import smtplib
 import threading
 import psycopg2
@@ -107,23 +107,30 @@ def extract_text(image_file_path, hi_lo_file_path):
         None,
     )
 
+    error_to_catch = UnidentifiedImageError
+    retry_limit = 10
+    retries = 0
+
     while ite > 0:
-        try:
-            text_raw = pytesseract.image_to_string(Image.open(image_file_path))
-            text_hi_lo = pytesseract.image_to_string(Image.open(hi_lo_file_path))
-        except:
-            print("Could not read file, trying again...")
+        
+        
+        while retries < retry_limit:
             try:
+                text_raw = pytesseract.image_to_string(Image.open(image_file_path))
+                text_hi_lo = pytesseract.image_to_string(Image.open(hi_lo_file_path))
+                # If the action is successful, break out of the loop
+                break
+            except error_to_catch as e:
+                print("Could not read file, trying again...")
+                retries += 1
                 time.sleep(600)
                 image_file_path, hi_lo_file_path = download_image()
                 text_raw = pytesseract.image_to_string(Image.open(image_file_path))
                 text_hi_lo = pytesseract.image_to_string(Image.open(hi_lo_file_path))
-            except:
-                print("Could not read file, trying once more...")
-                time.sleep(600)
-                image_file_path, hi_lo_file_path = download_image()
-                text_raw = pytesseract.image_to_string(Image.open(image_file_path))
-                text_hi_lo = pytesseract.image_to_string(Image.open(hi_lo_file_path))
+                # If the retry limit is reached, raise the error again
+                if retries == retry_limit:
+                    send_text(recipients["Marc"], "Marc", "Weather collector failed to scrape image")
+                    raise e
 
         text_list = text_raw.split("\n")
         hi_lo_list = text_hi_lo.split("\n")
