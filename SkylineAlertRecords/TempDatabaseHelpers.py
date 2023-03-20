@@ -67,14 +67,12 @@ def rename_tables(db_name, db_user, db_password, db_host, db_port, year):
 
 
 def insert_weather_data(
-    temp, wind, hum, hi, lo, baro, db_name, db_user, db_password, db_host, db_port
+    temp, wind, hum, hi, lo, baro, conn
 ):
 
     print("Loading temperature into Skyline temp database...")
     # Connect to the PostgreSQL database
-    conn = psycopg2.connect(
-        dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port
-    )
+
     cur = conn.cursor()
 
     # Get current month and year
@@ -107,7 +105,7 @@ def insert_weather_data(
 
     # Close the cursor and connection
     cur.close()
-    conn.close()
+
 
 
 def delete_all_tables(db_name, db_user, db_password, db_host, db_port):
@@ -302,11 +300,9 @@ def plot_monthly_temperature(db_name, db_user, db_password, db_host, db_port):
     conn.close()
 
 
-def create_daily_table(db_name, db_user, db_password, db_host, db_port):
+def create_daily_table(conn):
     # Connect to the PostgreSQL database
-    conn = psycopg2.connect(
-        dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port
-    )
+
     cur = conn.cursor()
 
     today = datetime.now()
@@ -338,20 +334,14 @@ def create_daily_table(db_name, db_user, db_password, db_host, db_port):
         conn.rollback()
     finally:
         cur.close()
-        conn.close()
+
 
 
 def insert_daily_data(
-    temp, wind, hum, baro, db_name, db_user, db_password, db_host, db_port
+    temp, wind, hum, baro, conn
 ):
     try:
-        conn = psycopg2.connect(
-            dbname=db_name,
-            user=db_user,
-            password=db_password,
-            host=db_host,
-            port=db_port,
-        )
+
         cur = conn.cursor()
 
         current_time = datetime.now()
@@ -390,8 +380,7 @@ def insert_daily_data(
     finally:
         if conn:
             cur.close()
-            conn.close()
-            print("PostgreSQL connection is closed")
+
 
 
 def backup_database(db_name, db_user, db_password, db_host, db_port, backup_directory):
